@@ -9,6 +9,22 @@ function jsonResponse(body: unknown, status = 200, headers?: HeadersInit): Respo
 }
 
 describe('Spotify API client', () => {
+  it('invokes fetch with the global receiver', async () => {
+    const seen = { usesGlobalReceiver: false }
+    const fetchImpl = async function (this: unknown) {
+      seen.usesGlobalReceiver = this === globalThis
+      return jsonResponse({ account_id: 'acct' })
+    }
+
+    await spotifyJson({
+      path: '/me',
+      tokenSource: { getValidAccessToken: async () => 'access-token', forceRefreshAccessToken: async () => 'unused' },
+      fetchImpl: fetchImpl as typeof fetch,
+    })
+
+    expect(seen.usesGlobalReceiver).toBe(true)
+  })
+
   it('sends one authorized request and returns JSON', async () => {
     const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       expect(String(input)).toBe('https://api.spotify.com/v1/me')

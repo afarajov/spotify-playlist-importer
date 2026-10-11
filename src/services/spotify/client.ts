@@ -70,7 +70,7 @@ async function send(
 ): Promise<{ response: Response; body: unknown }> {
   let response: Response
   try {
-    response = await fetchImpl(`${SPOTIFY_API_BASE_URL}${path}`, {
+    response = await fetchImpl.call(globalThis, `${SPOTIFY_API_BASE_URL}${path}`, {
       method: request.method ?? 'GET',
       headers: {
         Authorization: `Bearer ${accessToken}`,

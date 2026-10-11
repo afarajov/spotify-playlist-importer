@@ -57,7 +57,7 @@ export function refreshAccessToken(input: {
 async function requestToken(input: TokenRequest): Promise<TokenSet> {
   let response: Response
   try {
-    response = await input.fetchImpl(SPOTIFY_TOKEN_URL, {
+    response = await input.fetchImpl.call(globalThis, SPOTIFY_TOKEN_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: input.body,
