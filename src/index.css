@@ -1,0 +1,56 @@
+@import '@fontsource-variable/instrument-sans/wght.css';
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Instrument Sans Variable', ui-sans-serif, system-ui, sans-serif;
+  --color-ink: #080a09;
+  --color-ink-raised: #101311;
+  --color-panel: #131715;
+  --color-field: #0c0e0d;
+  --color-line: #2b332e;
+  --color-line-strong: #3d4740;
+  --color-text: #f3f5f2;
+  --color-muted: #9aa39b;
+  --color-faint: #7d847e;
+  --color-accent: #3ddc84;
+  --color-accent-ink: #062216;
+  --color-spot: #e2c07a;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100svh;
+    background-color: var(--color-ink);
+    background-image: radial-gradient(
+      ellipse 72% 40% at 50% -12%,
+      rgb(61 220 132 / 0.08),
+      transparent 58%
+    );
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: rgb(61 220 132 / 0.28);
+    color: var(--color-text);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
