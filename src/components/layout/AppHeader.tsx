@@ -1,7 +1,5 @@
 import { pageColumnClass } from '../../app/layout.ts'
-
-const spotifyUnavailableMessage =
-  'Spotify sign-in is not configured yet and will be available in a later phase.'
+import { SpotifyAccountControl } from '../../features/auth/SpotifyAccountControl.tsx'
 
 export function AppHeader() {
   return (
@@ -17,20 +15,7 @@ export function AppHeader() {
           <BrandMark />
           <p className="truncate text-[15px] font-semibold tracking-[-0.02em]">Playlist Importer</p>
         </div>
-        <div className="flex items-center gap-2.5 sm:gap-3">
-          <p className="flex items-center gap-2 text-xs text-muted">
-            <span className="size-1.5 shrink-0 rounded-full bg-spot" aria-hidden="true" />
-            Not configured
-          </p>
-          <button
-            type="button"
-            disabled
-            className="inline-flex h-10 shrink-0 cursor-not-allowed items-center rounded-full border border-line-strong bg-ink-raised px-3.5 text-sm font-medium text-muted"
-          >
-            Connect Spotify
-            <span className="sr-only">. {spotifyUnavailableMessage}</span>
-          </button>
-        </div>
+        <SpotifyAccountControl />
       </div>
     </header>
   )

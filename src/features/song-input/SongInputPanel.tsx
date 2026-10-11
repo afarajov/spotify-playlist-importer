@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { PrimaryButton } from '../../components/ui/PrimaryButton.tsx'
 import type { InputMode } from '../../shared/types/index.ts'
+import { readSongDraft, writeSongDraft } from './draft.ts'
 import { FileUpload } from './FileUpload.tsx'
 import { describeInputStats } from './input-stats.ts'
 import { modeContent } from './mode-content.ts'
@@ -8,8 +9,13 @@ import { ModeSelector } from './ModeSelector.tsx'
 import { SongInput } from './SongInput.tsx'
 
 export function SongInputPanel() {
-  const [mode, setMode] = useState<InputMode>('manual')
-  const [songText, setSongText] = useState('')
+  const [storedDraft] = useState(() => readSongDraft())
+  const [mode, setMode] = useState<InputMode>(storedDraft?.mode ?? 'manual')
+  const [songText, setSongText] = useState(storedDraft?.text ?? '')
+
+  useEffect(() => {
+    writeSongDraft({ mode, text: songText })
+  }, [mode, songText])
   const content = modeContent[mode]
   const stats = describeInputStats(songText)
 
