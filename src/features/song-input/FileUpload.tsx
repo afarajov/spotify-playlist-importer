@@ -1,39 +1,95 @@
-const supportedFileTypes = '.txt and .csv'
+type PendingFile = {
+  fileName: string
+  kind: 'txt' | 'csv'
+}
 
-export function FileUpload() {
+type FileUploadProps = {
+  disabled: boolean
+  fileName: string | null
+  error: string | null
+  pending: PendingFile | null
+  onFile: (file: File) => void
+  onConfirm: () => void
+  onCancel: () => void
+}
+
+export function FileUpload({ disabled, fileName, error, pending, onFile, onConfirm, onCancel }: FileUploadProps) {
   return (
-    <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-dashed border-line-strong/90 bg-field/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-start gap-3">
-        <FileIcon />
-        <div>
-          <p className="text-sm font-medium">Import a file</p>
-          <p id="file-upload-note" className="mt-0.5 text-sm leading-5 text-muted">
-            {supportedFileTypes} import will be available in a later stage.
-          </p>
+    <div className="mt-4 rounded-2xl border border-dashed border-line-strong/90 bg-field/60 px-4 py-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <FileIcon muted={disabled} />
+          <div className="min-w-0">
+            <p className="text-sm font-medium">{fileName ? fileName : 'Import a file'}</p>
+            <p id="file-upload-note" className="mt-0.5 text-sm leading-5 text-muted">
+              .txt or .csv, up to 1 MB and 1,000 songs. Files stay on this device.
+            </p>
+          </div>
         </div>
+        <label
+          className={`relative inline-flex h-10 items-center justify-center rounded-full border border-line px-4 text-sm font-medium ${
+            disabled ? 'cursor-not-allowed text-faint' : 'cursor-pointer text-text hover:border-accent/70'
+          }`}
+        >
+          Choose file
+          <input
+            type="file"
+            accept=".txt,.csv,text/plain,text/csv"
+            disabled={disabled}
+            aria-describedby="file-upload-note"
+            className="sr-only"
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0]
+              event.currentTarget.value = ''
+              if (file) {
+                onFile(file)
+              }
+            }}
+          />
+        </label>
       </div>
-      <label className="relative inline-flex h-10 cursor-not-allowed items-center justify-center rounded-full border border-line px-4 text-sm font-medium text-faint">
-        Choose file
-        <input
-          type="file"
-          accept=".txt,.csv,text/plain,text/csv"
-          disabled
-          aria-describedby="file-upload-note"
-          className="sr-only"
-        />
-      </label>
+      {pending ? (
+        <div className="mt-3 flex flex-col gap-2 border-t border-line pt-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm leading-5 text-text">
+            {pending.kind === 'txt'
+              ? `Replace the current song list with ${pending.fileName}?`
+              : `Use ${pending.fileName} for the review? The text you typed stays in the box.`}
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onConfirm}
+              className="inline-flex h-9 items-center rounded-full bg-accent px-3 text-sm font-semibold text-accent-ink"
+            >
+              Replace list
+            </button>
+            <button
+              type="button"
+              onClick={onCancel}
+              className="inline-flex h-9 items-center rounded-full border border-line px-3 text-sm text-muted hover:text-text"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {error ? (
+        <p role="alert" className="mt-3 text-sm leading-5 text-spot">
+          {error}
+        </p>
+      ) : null}
     </div>
   )
 }
 
-function FileIcon() {
+function FileIcon({ muted }: { muted: boolean }) {
   return (
     <svg
       width="20"
       height="20"
       viewBox="0 0 20 20"
       aria-hidden="true"
-      className="mt-0.5 shrink-0 text-faint"
+      className={`mt-0.5 shrink-0 ${muted ? 'text-faint' : 'text-accent'}`}
     >
       <path
         d="M6.2 2.5h5.1L15.5 6.7V16a1.5 1.5 0 0 1-1.5 1.5H6.2A1.5 1.5 0 0 1 4.7 16V4a1.5 1.5 0 0 1 1.5-1.5Z"

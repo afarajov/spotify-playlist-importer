@@ -22,10 +22,10 @@ describe('App', () => {
       expect(connectButton).toBeDisabled()
       expect(screen.getByText(/before connecting a Spotify account/i)).toBeInTheDocument()
     }
-    expect(screen.getByRole('button', { name: 'Find My Songs' })).toBeDisabled()
-    expect(screen.getByLabelText('Choose file')).toBeDisabled()
-    expect(screen.getByText(/song processing will be available in a later phase/i)).toBeInTheDocument()
-    expect(screen.getByText(/\.txt and \.csv import will be available in a later stage/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Review Songs' })).toBeDisabled()
+    expect(screen.getByLabelText('Choose file')).toBeEnabled()
+    expect(screen.getByText(/one song on each line/i)).toBeInTheDocument()
+    expect(screen.getByText(/files stay on this device/i)).toBeInTheDocument()
   })
 
   it('starts in Manual Mode with format guidance', () => {
@@ -55,6 +55,9 @@ describe('App', () => {
     expect(songList).toHaveValue('Radiohead - Creep')
     expect(songList.getAttribute('placeholder')).toContain('blinding lights by weekend')
     expect(screen.getByText('1 line · 17 characters')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Review Songs' })).toBeDisabled()
+    expect(screen.getByLabelText('Choose file')).toBeDisabled()
+    expect(screen.getByText(/AI processing is coming later/i)).toBeInTheDocument()
   })
 
   it('keeps the song list when returning to Manual Mode', async () => {
@@ -69,6 +72,8 @@ describe('App', () => {
     expect(screen.getByRole('radio', { name: 'Manual Mode' })).toBeChecked()
     expect(songList).toHaveValue('Daft Punk - Get Lucky')
     expect(screen.getByText('Artist - Song Title')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Review Songs' })).toBeEnabled()
+    expect(screen.getByLabelText('Choose file')).toBeEnabled()
   })
 
   it('restores the song draft after the page is mounted again', async () => {

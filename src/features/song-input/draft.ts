@@ -1,10 +1,14 @@
-import type { InputMode } from '../../shared/types/index.ts'
+import type { InputMode, SongEntry, SongSource } from '../../shared/types/index.ts'
 import { browserSessionStorage, SONG_DRAFT_STORAGE_KEY, type KeyValueStorage } from '../auth/storage.ts'
 
 export type SongDraft = {
   mode: InputMode
   text: string
   updatedAt: number
+  review: SongEntry[] | null
+  reviewedText: string
+  prepared: boolean
+  fileName: string | null
 }
 
 export function readSongDraft(storage: KeyValueStorage = browserSessionStorage()): SongDraft | null {
@@ -18,7 +22,15 @@ export function readSongDraft(storage: KeyValueStorage = browserSessionStorage()
       storage.remove(SONG_DRAFT_STORAGE_KEY)
       return null
     }
-    return parsed
+    return {
+      mode: parsed.mode,
+      text: parsed.text,
+      updatedAt: parsed.updatedAt,
+      review: isSongEntryList(parsed.review) ? parsed.review : null,
+      reviewedText: typeof parsed.reviewedText === 'string' ? parsed.reviewedText : '',
+      prepared: parsed.prepared === true && isSongEntryList(parsed.review),
+      fileName: typeof parsed.fileName === 'string' ? parsed.fileName : null,
+    }
   } catch {
     storage.remove(SONG_DRAFT_STORAGE_KEY)
     return null
@@ -26,7 +38,14 @@ export function readSongDraft(storage: KeyValueStorage = browserSessionStorage()
 }
 
 export function writeSongDraft(
-  draft: { mode: InputMode; text: string },
+  draft: {
+    mode: InputMode
+    text: string
+    review?: SongEntry[] | null
+    reviewedText?: string
+    prepared?: boolean
+    fileName?: string | null
+  },
   storage: KeyValueStorage = browserSessionStorage(),
   now = Date.now(),
 ): void {
@@ -34,11 +53,19 @@ export function writeSongDraft(
   if (existing && existing.updatedAt > now) {
     return
   }
-  const next: SongDraft = { mode: draft.mode, text: draft.text, updatedAt: now }
+  const next: SongDraft = {
+    mode: draft.mode,
+    text: draft.text,
+    updatedAt: now,
+    review: draft.review ?? null,
+    reviewedText: draft.reviewedText ?? '',
+    prepared: draft.prepared === true,
+    fileName: draft.fileName ?? null,
+  }
   storage.set(SONG_DRAFT_STORAGE_KEY, JSON.stringify(next))
 }
 
-function isSongDraft(value: unknown): value is SongDraft {
+function isSongDraft(value: unknown): value is Partial<SongDraft> & Pick<SongDraft, 'mode' | 'text' | 'updatedAt'> {
   if (typeof value !== 'object' || value === null) {
     return false
   }
@@ -47,5 +74,27 @@ function isSongDraft(value: unknown): value is SongDraft {
     (draft.mode === 'manual' || draft.mode === 'ai') &&
     typeof draft.text === 'string' &&
     typeof draft.updatedAt === 'number'
+  )
+}
+
+function isSongEntryList(value: unknown): value is SongEntry[] {
+  return Array.isArray(value) && value.every(isSongEntry)
+}
+
+function isSongEntry(value: unknown): value is SongEntry {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+  const entry = value as Partial<SongEntry>
+  const source: SongSource | null =
+    entry.source === 'manual' || entry.source === 'txt' || entry.source === 'csv' ? entry.source : null
+  return (
+    typeof entry.id === 'string' &&
+    source !== null &&
+    typeof entry.originalText === 'string' &&
+    typeof entry.originalLine === 'number' &&
+    typeof entry.artist === 'string' &&
+    typeof entry.title === 'string' &&
+    (entry.issue === null || typeof entry.issue === 'string')
   )
 }

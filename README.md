@@ -2,7 +2,7 @@
 
 Turn a list of songs into a Spotify playlist with as little effort as possible.
 
-This repository is a single-page playlist importer. Spotify sign-in uses the Authorization Code flow with PKCE in the browser. Song parsing, track matching, playlist changes, and AI are not implemented yet.
+This repository is a single-page playlist importer. Spotify sign-in uses the Authorization Code flow with PKCE in the browser. Manual lists and `.txt` or `.csv` files can be reviewed and edited. Track matching, playlist changes, and AI are not implemented yet.
 
 ## Stack
 
@@ -76,6 +76,30 @@ Requested scopes are `user-read-private`, `playlist-read-private`, `playlist-rea
 
 The browser keeps the PKCE transaction and the signed-in session in `sessionStorage` for the current tab. That survives the Spotify redirect and a reload, and it is cleared when the tab closes. It is not `localStorage`. Any script running on this origin can read it, so the app never writes tokens into the URL, the interface, or logs.
 
+## Song lists
+
+Manual Mode reads one song per line:
+
+```text
+The Weeknd - Blinding Lights
+Arctic Monkeys - 505
+Radiohead - Creep
+```
+
+The separator is ` - `, including the spaces. Only the first separator matters, so `Artist - Song Title - Live Version` keeps `Song Title - Live Version` as the title. Empty lines are skipped. A line without that separator, or with a missing artist or title, stays in the review with an explanation. Spelling is not corrected here.
+
+`.txt` files use the same format. `.csv` files need `artist` and `title` columns in either order. Extra columns are ignored. Quoted values can contain commas.
+
+```csv
+artist,title
+The Weeknd,Blinding Lights
+Arctic Monkeys,505
+```
+
+Files are read in the browser as UTF-8, up to 1 MB and 1,000 songs. Nothing is uploaded. Choosing a file asks before it replaces a list you already typed or reviewed. The same artist and title, ignoring case and extra spaces, is marked as a duplicate and left in the list until you remove it.
+
+AI Mode does not parse this format. Spotify track search and playlist import are not implemented yet.
+
 ## Current status
 
 Implemented:
@@ -83,16 +107,16 @@ Implemented:
 - Dark single-page layout
 - AI Mode / Manual Mode toggle, defaulting to Manual Mode
 - Song list field that keeps its text when the mode changes, including across the Spotify redirect
+- Manual review of `Artist - Song Title` lines, plus `.txt` and `.csv` import
+- Editing, removal, validation, and exact duplicate marking
 - Mode-specific guidance and placeholders
-- Prepared file-import and “Find My Songs” controls, both unavailable
 - Workflow indicator, with “Add Songs” as the current step
 - Spotify Authorization Code flow with PKCE, token refresh, profile display, and local disconnect
 - Shared TypeScript types for songs, matches, playlists, import results, and the connected account
 
 Not implemented:
 
-- Manual or AI parsing
-- File parsing
+- AI parsing
 - Track search and matching
 - Playlist creation or import
 
@@ -105,7 +129,7 @@ src/
   components/workflow/  import steps
   components/ui/        shared controls
   features/auth/        PKCE, token session, account controls
-  features/song-input/  mode, text input, file control, draft
+  features/song-input/  mode, text input, manual and CSV parsing, review
   services/spotify/     authenticated request helper and profile
   shared/types/         application data model
   config/               public environment values and Spotify endpoints
@@ -115,4 +139,4 @@ Later phases can add `src/features/matching`, `src/features/playlists`, and `src
 
 ## Next phase
 
-Phase 3 is manual song-list parsing: turn the text field into structured song lines without calling Spotify or AI.
+Phase 4 is Spotify track search: take the prepared artist and title values and find candidate tracks. AI parsing stays separate.

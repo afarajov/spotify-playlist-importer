@@ -7,7 +7,15 @@ describe('song draft', () => {
     const storage = createMemoryStorage()
     writeSongDraft({ mode: 'ai', text: 'Radiohead - Creep' }, storage, 10)
 
-    expect(readSongDraft(storage)).toEqual({ mode: 'ai', text: 'Radiohead - Creep', updatedAt: 10 })
+    expect(readSongDraft(storage)).toEqual({
+      mode: 'ai',
+      text: 'Radiohead - Creep',
+      updatedAt: 10,
+      review: null,
+      reviewedText: '',
+      prepared: false,
+      fileName: null,
+    })
   })
 
   it('does not replace a newer draft with an older write', () => {
