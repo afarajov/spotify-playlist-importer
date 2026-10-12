@@ -163,6 +163,7 @@ describe('Spotify session', () => {
 
     const account: SpotifyAccount = {
       accountId: 'acct_1',
+      userId: null,
       displayName: 'Ada Lovelace',
       imageUrl: 'https://i.scdn.co/image/ada',
       profileUrl: 'https://open.spotify.com/user/ada',

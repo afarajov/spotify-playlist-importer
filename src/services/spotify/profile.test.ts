@@ -20,6 +20,7 @@ describe('Spotify profile', () => {
       }),
     ).toEqual({
       accountId: 'acct_1',
+      userId: 'legacy-id',
       displayName: 'Ada Lovelace',
       imageUrl: 'https://i.scdn.co/image/large',
       profileUrl: 'https://open.spotify.com/user/ada',
@@ -29,9 +30,13 @@ describe('Spotify profile', () => {
   it('tolerates a missing name and image', () => {
     expect(parseSpotifyAccount({ account_id: 'acct_1', display_name: null, images: [] })).toEqual({
       accountId: 'acct_1',
+      userId: null,
       displayName: null,
       imageUrl: null,
       profileUrl: null,
+    })
+    expect(parseSpotifyAccount({ account_id: 'acct_1', uri: 'spotify:user:from-uri' })).toMatchObject({
+      userId: 'from-uri',
     })
     expect(parseSpotifyAccount({ id: 'legacy-only' })).toBeNull()
   })

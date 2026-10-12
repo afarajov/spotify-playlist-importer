@@ -22,10 +22,24 @@ export function parseSpotifyAccount(body: unknown): SpotifyAccount | null {
     : null
   return {
     accountId: body.account_id,
+    userId: legacyUserId(body),
     displayName,
     imageUrl: largestHttpsImage(body.images),
     profileUrl: httpsUrl(isRecord(body.external_urls) ? body.external_urls.spotify : null),
   }
+}
+
+function legacyUserId(body: Record<string, unknown>): string | null {
+  if (typeof body.id === 'string' && body.id.length > 0) {
+    return body.id
+  }
+  if (typeof body.uri === 'string') {
+    const match = /^spotify:user:(.+)$/.exec(body.uri)
+    if (match?.[1]) {
+      return decodeURIComponent(match[1])
+    }
+  }
+  return null
 }
 
 function largestHttpsImage(value: unknown): string | null {
