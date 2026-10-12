@@ -336,8 +336,11 @@ function SongRow({
       <div className="flex items-start gap-3">
         <span className="w-8 shrink-0 pt-0.5 text-sm text-faint tabular-nums">{positionLabel}</span>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium break-words">{entry.artist || 'No artist'}</p>
-          <p className="text-sm break-words text-muted">{entry.title || 'No title'}</p>
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+            <p className="truncate text-sm font-medium">{entry.artist || 'No artist'}</p>
+            <p className="truncate text-sm text-muted">{entry.title || 'No title'}</p>
+            {entry.issue ? null : <p className="text-xs text-accent">{duplicate ? 'Duplicate' : 'Ready'}</p>}
+          </div>
           {entry.issue ? (
             <p className="mt-1 text-sm leading-5 text-spot">
               {entry.issue}{' '}
@@ -345,9 +348,7 @@ function SongRow({
                 {locationLabel} {entry.originalLine}: {entry.originalText}
               </span>
             </p>
-          ) : (
-            <p className="mt-1 text-xs text-accent">{duplicate ? 'Duplicate' : 'Ready'}</p>
-          )}
+          ) : null}
           {match && !entry.issue ? (
             <MatchDetails
               songLabel={songLabel}

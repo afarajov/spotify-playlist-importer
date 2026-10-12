@@ -78,7 +78,12 @@ describe('Spotify match review', () => {
     expect(screen.getByText(/2 tracks are ready for import/i)).toBeInTheDocument()
 
     await user.click(screen.getAllByRole('button', { name: 'Change match' })[0])
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Hide matches' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Confirm match' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /Blinding Lights - Live/i }))
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
+    expect(screen.queryByRole('list', { name: /Other matches for/i })).not.toBeInTheDocument()
     expect(screen.getByText(/Confirmed/)).toBeInTheDocument()
     expect(screen.getAllByText('Creep').length).toBeGreaterThan(0)
 
