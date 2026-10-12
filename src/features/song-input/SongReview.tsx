@@ -19,6 +19,7 @@ type SongReviewProps = {
   onEdit: (id: string, artist: string, title: string) => void
   onRemove: (id: string) => void
   onFind: () => void
+  onChoosePlaylist: () => void
   onCancelSearch: () => void
   onSelectMatch: (songId: string, trackId: string) => void
   onConfirmMatch: (songId: string) => void
@@ -40,6 +41,7 @@ export function SongReview({
   onEdit,
   onRemove,
   onFind,
+  onChoosePlaylist,
   onCancelSearch,
   onSelectMatch,
   onConfirmMatch,
@@ -171,15 +173,22 @@ export function SongReview({
             <p id="find-spotify-note" className="text-sm leading-6 text-muted">
               {searchNote(summary.valid, entries.length, isAuthenticated, readyCount, progress?.active === true)}
             </p>
-            <button
-              type="button"
-              disabled={entries.length === 0 || !isAuthenticated || progress?.active === true}
-              aria-describedby="find-spotify-note"
-              onClick={onFind}
-              className="inline-flex h-11 w-full items-center justify-center rounded-full bg-accent px-5 text-sm font-semibold text-accent-ink transition-colors hover:bg-[#34c978] disabled:cursor-not-allowed disabled:bg-[#143024] disabled:text-accent sm:w-auto"
-            >
-              Find on Spotify
-            </button>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+              <button
+                type="button"
+                disabled={entries.length === 0 || !isAuthenticated || progress?.active === true}
+                aria-describedby="find-spotify-note"
+                onClick={onFind}
+                className={`inline-flex h-11 w-full items-center justify-center rounded-full px-5 text-sm font-semibold sm:w-auto ${readyCount > 0 ? 'border border-line text-muted hover:border-line-strong hover:text-text' : 'bg-accent text-accent-ink hover:bg-[#34c978] disabled:cursor-not-allowed disabled:bg-[#143024] disabled:text-accent'}`}
+              >
+                Find on Spotify
+              </button>
+              {readyCount > 0 ? (
+                <button type="button" onClick={onChoosePlaylist} className="inline-flex h-11 w-full items-center justify-center rounded-full bg-accent px-5 text-sm font-semibold text-accent-ink hover:bg-[#34c978] sm:w-auto">
+                  Choose playlist
+                </button>
+              ) : null}
+            </div>
           </div>
         </div>
       </div>
@@ -201,7 +210,7 @@ function searchNote(valid: number, entryCount: number, isAuthenticated: boolean,
     return 'Searching the songs that are ready. Spotify playlists are not changed.'
   }
   if (readyCount > 0) {
-    return `${readyCount} ${readyCount === 1 ? 'track is' : 'tracks are'} ready for import. Playlist changes come later.`
+    return `${readyCount} ${readyCount === 1 ? 'track is' : 'tracks are'} ready for import. Choose a playlist when the matches look right.`
   }
   return 'Searches the songs that are ready. Spotify playlists are not changed.'
 }

@@ -1,13 +1,20 @@
 export type PlaylistVisibility = 'public' | 'private'
 
+export type PlaylistEditability = 'likely' | 'unconfirmed'
+
 export type EditablePlaylist = {
   id: string
   name: string
   description: string
-  visibility: PlaylistVisibility
-  trackCount: number
+  visibility: PlaylistVisibility | null
+  trackCount: number | null
   ownerName: string
+  ownerId: string
   canModify: boolean
+  editability: PlaylistEditability
+  collaborative: boolean
+  imageUrl: string | null
+  externalUrl: string | null
 }
 
 export type PlaylistDestination =

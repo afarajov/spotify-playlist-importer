@@ -2,7 +2,7 @@
 
 Turn a list of songs into a Spotify playlist with as little effort as possible.
 
-This repository is a single-page playlist importer. Spotify sign-in uses the Authorization Code flow with PKCE in the browser. Manual lists and `.txt` or `.csv` files can be reviewed, then matched to Spotify tracks with a local scoring algorithm. Playlist changes and AI parsing are not implemented yet.
+This repository is a single-page playlist importer. Spotify sign-in uses the Authorization Code flow with PKCE in the browser. Manual lists and `.txt` or `.csv` files can be reviewed, matched to Spotify tracks locally, and appended to a playlist. AI parsing is not implemented yet.
 
 ## Stack
 
@@ -72,7 +72,7 @@ Development Mode limits, from Spotify's current quota-mode documentation:
 - Development Mode has a request quota. A 429 response is a quota or rate limit, not a failed password.
 - Extended quota mode is for organizations and is not part of this app.
 
-Requested scopes are `user-read-private`, `playlist-read-private`, `playlist-read-collaborative`, `playlist-modify-private`, and `playlist-modify-public`. `playlist-read-collaborative` is included so a later phase can list collaborative playlists the user may edit. Re-consent would be required if it were added later. Email, playback, listening history, library changes, and streaming are not requested.
+Requested scopes are `user-read-private`, `playlist-read-private`, `playlist-read-collaborative`, `playlist-modify-private`, and `playlist-modify-public`. Those playlist scopes cover listing private and collaborative playlists and creating or updating public and private playlists. Email, playback, listening history, library changes, and streaming are not requested. If an older session is missing a playlist scope, the import screen asks you to connect again. The song list in this tab is kept.
 
 The browser keeps the PKCE transaction and the signed-in session in `sessionStorage` for the current tab. That survives the Spotify redirect and a reload, and it is cleared when the tab closes. It is not `localStorage`. Any script running on this origin can read it, so the app never writes tokens into the URL, the interface, or logs.
 
@@ -98,7 +98,7 @@ Arctic Monkeys,505
 
 Files are read in the browser as UTF-8, up to 1 MB and 1,000 songs. Nothing is uploaded. Choosing a file asks before it replaces a list you already typed or reviewed. The same artist and title, ignoring case and extra spaces, is marked as a duplicate. Find on Spotify removes those later copies, along with lines that are not `Artist - Song Title`, and searches what remains. The first copy of a song stays.
 
-AI Mode does not parse this format. Playlist import is not implemented yet.
+AI Mode does not parse this format. The same duplicate rows are not removed during import. A repeated song in the list stays repeated unless that exact Spotify track is already in the destination playlist and skipping is turned on.
 
 ## Spotify search
 
@@ -112,9 +112,25 @@ Matching runs locally. It compares normalized artist and title text, then adjust
 - Medium confidence: the best track is shown and must be confirmed.
 - Low confidence or no suitable track: nothing is selected until the user chooses one.
 
-**Change match** lists the returned recordings. **Search manually** runs one explicit Spotify query for that row. Editing the artist or title clears that row’s match and leaves the other rows alone. Confirmed tracks and high-confidence matches are kept as an ordered list of Spotify URIs for the next phase. This phase does not create or change playlists.
+**Change match** lists the returned recordings. **Confirm** accepts the open choice and closes that list. **Search manually** runs one explicit Spotify query for that row. Editing the artist or title clears that row’s match and leaves the other rows alone. Confirmed tracks and high-confidence matches are the songs that can be imported, in the original list order.
 
 Thresholds and request limits live in `src/features/matching/config.ts`.
+
+## Playlist import
+
+**Choose playlist** appears after at least one song is ready. The song list stays on this device while you pick a destination.
+
+**Existing playlist** loads the first page of `GET /me/playlists` (50 at a time). Followed playlists that you do not own and that are not collaborative are hidden. Playlists you own are treated as editable. Ownership matches either the stable `account_id` or the legacy Spotify user `id`, because playlist owners still use the legacy id. Collaborative playlists are shown with a note that Spotify still has to allow the change. **Load more playlists** fetches the next page. The name filter searches only playlists already loaded.
+
+**Skip songs already in playlist** is the default for an existing playlist. The app reads `GET /playlists/{id}/items` and compares Spotify track URIs, not song titles. Tracks already in the playlist are left out and counted separately. Repeated rows in your own list are still added when that track is not already there. **Allow duplicates** appends every ready track, including ones the playlist already has. If Spotify refuses to show the playlist contents, duplicate checking is unavailable and the import does not pretend the playlist is empty. You can choose to import without that check.
+
+**New playlist** asks for a name, an optional description, and public or private visibility. Private is the default. The playlist is not created when you type the name or switch tabs. `POST /me/playlists` runs only after the final confirmation, and only if there are songs to add. `public` is sent explicitly so Spotify’s default of public is not used by accident.
+
+The preview shows the destination, how many songs were entered, how many are ready, how many still need review, and how many were not found. Nothing is sent until you press the import button. The label is **Add N songs to playlist** or **Create playlist and import N songs**.
+
+Tracks are appended in the prepared order with `POST /playlists/{id}/items`, at most 100 URIs per request, one batch at a time. Progress counts songs Spotify has confirmed. A confirmed failure stops later batches so their order is not scrambled. Those later batches can be retried without sending the batches that already succeeded. A lost response, a network drop, or an HTTP 500 is treated as uncertain: that batch is not sent again until you check the playlist or explicitly say the songs are missing. A new playlist that might already have been created is not created a second time automatically. The app does not delete, replace, rename, or reorder an existing playlist.
+
+A normal 429 waits once, up to 20 seconds, and retries that rejected request. `QUOTA_EXCEEDED` stops the import. An expired access token is refreshed with the existing session. If Spotify still rejects the session, reconnect from the header; the song draft remains in this tab. Completed batches are kept. If the page closes during an import, this tab stores an import journal in `sessionStorage` without tokens. Reloading shows the last confirmed state and does not continue the request. The journal cannot prove what an in-flight request did, and it disappears when the tab closes.
 
 ## Current status
 
@@ -127,14 +143,13 @@ Implemented:
 - Editing, removal, validation, and exact duplicate marking
 - Spotify track search, local match scoring, alternative selection, and manual search
 - Mode-specific guidance and placeholders
-- Workflow indicator, moving to “Review Matches” after a search starts
+- Workflow indicator through review, playlist choice, and import
 - Spotify Authorization Code flow with PKCE, token refresh, profile display, and local disconnect
-- Shared TypeScript types for songs, matches, playlists, import results, and the connected account
+- Playlist selection, private or public playlist creation, ordered batch import, and result reporting
 
 Not implemented:
 
 - AI parsing
-- Playlist creation or import
 
 ## Layout
 
@@ -147,13 +162,14 @@ src/
   features/auth/        PKCE, token session, account controls
   features/song-input/  mode, text input, manual and CSV parsing, review
   features/matching/    normalization, scoring, search queue, match review
-  services/spotify/     authenticated request helper, profile, and track search
+  features/import/      playlist choice, import plan, batches, and recovery
+  services/spotify/     authenticated request helper, profile, search, and playlists
   shared/types/         application data model
   config/               public environment values and Spotify endpoints
 ```
 
-Later phases can add `src/features/playlists` and `src/services/ai` without folding that work into the page component.
+Later phases can add `src/services/ai` without folding that work into the page component.
 
 ## Next phase
 
-Phase 5 is playlist import. It can take the ordered Spotify track URIs that the user confirmed, or that matching accepted with high confidence, and add them to a playlist. AI parsing stays separate and must not choose track IDs.
+Phase 6 is AI parsing. It should turn a messy song list into the same reviewed song entries Manual Mode already uses. It must not search Spotify, choose track IDs, or change how playlists are imported.

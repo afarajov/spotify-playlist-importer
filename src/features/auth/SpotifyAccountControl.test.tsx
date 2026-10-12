@@ -5,6 +5,7 @@ import { SpotifyAccountControlView } from './SpotifyAccountControl.tsx'
 
 const account = {
   accountId: 'acct_1',
+  userId: null,
   displayName: 'Ada Lovelace',
   imageUrl: 'https://i.scdn.co/image/ada',
   profileUrl: 'https://open.spotify.com/user/ada',

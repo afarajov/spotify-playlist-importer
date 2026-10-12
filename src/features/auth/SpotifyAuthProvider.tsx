@@ -39,6 +39,7 @@ export function SpotifyAuthProvider({
       },
       getValidAccessToken: () => spotifySession.getValidAccessToken(),
       forceRefreshAccessToken: () => spotifySession.forceRefreshAccessToken(),
+      grantedScopes: snapshot.grantedScopes ?? [],
     }),
     [snapshot, spotifySession],
   )

@@ -29,6 +29,7 @@ export type AuthSnapshot = {
   error: AuthError | null
   isConfigured: boolean
   configurationMessage: string | null
+  grantedScopes: readonly string[]
 }
 
 export type BrowserLocation = {
@@ -372,6 +373,7 @@ export class SpotifySession {
       error: this.error,
       isConfigured: isSpotifyConfigured(this.config),
       configurationMessage: missingSpotifyConfigMessage(this.config),
+      grantedScopes: signedIn ? session.scope.split(' ').filter((scope) => scope.length > 0) : [],
     }
   }
 

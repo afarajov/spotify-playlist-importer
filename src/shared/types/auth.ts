@@ -1,5 +1,7 @@
 export type SpotifyAccount = {
   accountId: string
+  /** Legacy Spotify user id from `/me`. Playlist owners still use this value. */
+  userId: string | null
   displayName: string | null
   imageUrl: string | null
   profileUrl: string | null

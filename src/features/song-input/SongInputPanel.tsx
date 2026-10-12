@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { PrimaryButton } from '../../components/ui/PrimaryButton.tsx'
 import { useSpotifyMatching } from '../matching/useSpotifyMatching.ts'
 import type { InputMode, SongEntry, WorkflowStage } from '../../shared/types/index.ts'
+import { ImportPanel } from '../import/ImportPanel.tsx'
+import { readImportJournal, writeImportJournal } from '../import/journal.ts'
 import { duplicateEntryIds, withoutProblemEntries } from './duplicates.ts'
 import { readSongDraft, writeSongDraft } from './draft.ts'
 import { FileUpload } from './FileUpload.tsx'
@@ -40,6 +42,8 @@ export function SongInputPanel({ onWorkflowStage }: SongInputPanelProps) {
   const [reviewOpen, setReviewOpen] = useState(false)
   const [cleanupNote, setCleanupNote] = useState<string | null>(null)
   const [readingFile, setReadingFile] = useState(false)
+  const [showImport, setShowImport] = useState(() => readImportJournal() !== null)
+  const [importSession, setImportSession] = useState(0)
   const fileRequest = useRef(0)
   const closeReview = useCallback(() => setReviewOpen(false), [])
   const matching = useSpotifyMatching(review)
@@ -49,10 +53,13 @@ export function SongInputPanel({ onWorkflowStage }: SongInputPanelProps) {
   }, [mode, songText, review, reviewedText, prepared, fileName])
 
   useEffect(() => {
+    if (showImport) {
+      return
+    }
     const searching = matching.progress?.active === true
     const hasMatches = Object.values(matching.matches).some((match) => match.status !== 'idle')
     onWorkflowStage?.(searching || hasMatches ? 'review_matches' : 'add_songs')
-  }, [matching.matches, matching.progress, onWorkflowStage])
+  }, [matching.matches, matching.progress, onWorkflowStage, showImport])
 
   const content = modeContent[mode]
   const stats = describeInputStats(songText)
@@ -140,6 +147,16 @@ export function SongInputPanel({ onWorkflowStage }: SongInputPanelProps) {
     }
   }
 
+  function openImport() {
+    const saved = readImportJournal()
+    if (!saved || saved.phase === 'completed' || saved.phase === 'partially_completed' || saved.phase === 'failed') {
+      writeImportJournal(null)
+      setImportSession((value) => value + 1)
+    }
+    setReviewOpen(false)
+    setShowImport(true)
+  }
+
   async function handleFile(file: File) {
     const request = fileRequest.current + 1
     fileRequest.current = request
@@ -172,6 +189,18 @@ export function SongInputPanel({ onWorkflowStage }: SongInputPanelProps) {
       return
     }
     applyImport(imported)
+  }
+
+  if (showImport) {
+    return (
+      <ImportPanel
+        key={importSession}
+        entries={review ?? []}
+        matches={matching.matches}
+        onBack={() => setShowImport(false)}
+        onWorkflowStage={onWorkflowStage}
+      />
+    )
   }
 
   return (
@@ -254,6 +283,7 @@ export function SongInputPanel({ onWorkflowStage }: SongInputPanelProps) {
             setPrepared(false)
           }}
           onFind={findOnSpotify}
+          onChoosePlaylist={openImport}
           onCancelSearch={matching.cancel}
           onSelectMatch={matching.select}
           onConfirmMatch={matching.confirm}
