@@ -12,6 +12,7 @@ export type SpotifyAuthContextValue = {
   connect: () => Promise<void>
   disconnect: () => void
   getValidAccessToken: () => Promise<string>
+  forceRefreshAccessToken: () => Promise<string>
 }
 
 export const SpotifyAuthContext = createContext<SpotifyAuthContextValue | null>(null)

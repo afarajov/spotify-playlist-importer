@@ -1,28 +1,50 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { SongEntry } from '../../shared/types/index.ts'
+import { MatchDetails } from '../matching/MatchDetails.tsx'
+import type { SearchProgress } from '../matching/useSpotifyMatching.ts'
+import type { SongEntry, TrackMatch } from '../../shared/types/index.ts'
 import { formatSongSummary, summarizeSongs } from './review.ts'
 
 type SongReviewProps = {
   open: boolean
   entries: readonly SongEntry[]
   duplicateIds: ReadonlySet<string>
-  prepared: boolean
+  matches: Readonly<Record<string, TrackMatch>>
+  progress: SearchProgress | null
+  notice: string | null
+  cleanupNote: string | null
+  readyCount: number
+  isAuthenticated: boolean
   onClose: () => void
   onEdit: (id: string, artist: string, title: string) => void
   onRemove: (id: string) => void
-  onPrepare: () => void
+  onFind: () => void
+  onCancelSearch: () => void
+  onSelectMatch: (songId: string, trackId: string) => void
+  onConfirmMatch: (songId: string) => void
+  onRetryMatch: (songId: string) => void
+  onManualSearch: (songId: string, query: string) => void
 }
 
 export function SongReview({
   open,
   entries,
   duplicateIds,
-  prepared,
+  matches,
+  progress,
+  notice,
+  cleanupNote,
+  readyCount,
+  isAuthenticated,
   onClose,
   onEdit,
   onRemove,
-  onPrepare,
+  onFind,
+  onCancelSearch,
+  onSelectMatch,
+  onConfirmMatch,
+  onRetryMatch,
+  onManualSearch,
 }: SongReviewProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
 
@@ -94,7 +116,7 @@ export function SongReview({
         aria-modal="true"
         aria-labelledby="song-review-title"
         tabIndex={-1}
-        className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl min-h-0 flex-col overflow-hidden rounded-[28px] border border-line bg-panel shadow-[0_30px_80px_-36px_rgb(0_0_0/0.9)] outline-none sm:max-h-[calc(100dvh-3rem)]"
+        className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-5xl min-h-0 flex-col overflow-hidden rounded-[28px] border border-line bg-panel shadow-[0_30px_80px_-36px_rgb(0_0_0/0.9)] outline-none sm:max-h-[calc(100dvh-3rem)]"
       >
         <div className="flex items-start justify-between gap-3 border-b border-line px-4 py-4 sm:px-5">
           <div className="min-w-0">
@@ -120,7 +142,8 @@ export function SongReview({
             </div>
           ))}
         </dl>
-        <ol className="max-h-[calc(100dvh-16rem)] divide-y divide-line overflow-y-auto overscroll-contain px-4 sm:max-h-[min(28rem,calc(100dvh-16rem))] sm:px-5">
+        {progress ? <SearchProgressBar progress={progress} notice={notice} onCancel={onCancelSearch} /> : null}
+        <ol className="max-h-[calc(100dvh-18rem)] divide-y divide-line overflow-y-auto overscroll-contain px-4 sm:max-h-[min(28rem,calc(100dvh-18rem))] sm:px-5">
           {entries.length === 0 ? (
             <li className="py-6 text-sm text-muted">No songs left in this list.</li>
           ) : (
@@ -130,36 +153,34 @@ export function SongReview({
                 entry={entry}
                 position={index + 1}
                 duplicate={duplicateIds.has(entry.id)}
+                match={matches[entry.id]}
+                searchBusy={progress?.active === true}
                 onEdit={onEdit}
                 onRemove={onRemove}
+                onSelectMatch={onSelectMatch}
+                onConfirmMatch={onConfirmMatch}
+                onRetryMatch={onRetryMatch}
+                onManualSearch={onManualSearch}
               />
             ))
           )}
         </ol>
         <div className="shrink-0 border-t border-line px-4 py-4 sm:px-5">
-          {prepared ? (
-            <p className="text-sm leading-6 text-muted">
-              {summary.valid} {summary.valid === 1 ? 'song is' : 'songs are'} ready for Spotify search. Finding
-              tracks comes in the next phase.
+          {cleanupNote ? <p className="mb-3 text-sm leading-6 text-muted">{cleanupNote}</p> : null}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p id="find-spotify-note" className="text-sm leading-6 text-muted">
+              {searchNote(summary.valid, entries.length, isAuthenticated, readyCount, progress?.active === true)}
             </p>
-          ) : (
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p id="prepare-search-note" className="text-sm leading-6 text-muted">
-                {summary.valid === 0
-                  ? 'Correct a song above before preparing the list.'
-                  : 'This checks your list only. Spotify matches come later.'}
-              </p>
-              <button
-                type="button"
-                disabled={summary.valid === 0}
-                aria-describedby="prepare-search-note"
-                onClick={onPrepare}
-                className="inline-flex h-11 w-full items-center justify-center rounded-full bg-accent px-5 text-sm font-semibold text-accent-ink transition-colors hover:bg-[#34c978] disabled:cursor-not-allowed disabled:bg-[#143024] disabled:text-accent sm:w-auto"
-              >
-                Prepare for search
-              </button>
-            </div>
-          )}
+            <button
+              type="button"
+              disabled={entries.length === 0 || !isAuthenticated || progress?.active === true}
+              aria-describedby="find-spotify-note"
+              onClick={onFind}
+              className="inline-flex h-11 w-full items-center justify-center rounded-full bg-accent px-5 text-sm font-semibold text-accent-ink transition-colors hover:bg-[#34c978] disabled:cursor-not-allowed disabled:bg-[#143024] disabled:text-accent sm:w-auto"
+            >
+              Find on Spotify
+            </button>
+          </div>
         </div>
       </div>
     </div>,
@@ -167,18 +188,82 @@ export function SongReview({
   )
 }
 
+function searchNote(valid: number, entryCount: number, isAuthenticated: boolean, readyCount: number, searching: boolean): string {
+  if (!isAuthenticated) {
+    return 'Connect Spotify in the header before searching.'
+  }
+  if (valid === 0) {
+    return entryCount > 0
+      ? 'Find on Spotify removes duplicates and lines that are not Artist - Song Title.'
+      : 'Correct a song before searching.'
+  }
+  if (searching) {
+    return 'Searching the songs that are ready. Spotify playlists are not changed.'
+  }
+  if (readyCount > 0) {
+    return `${readyCount} ${readyCount === 1 ? 'track is' : 'tracks are'} ready for import. Playlist changes come later.`
+  }
+  return 'Searches the songs that are ready. Spotify playlists are not changed.'
+}
+
+function SearchProgressBar({ progress, notice, onCancel }: { progress: SearchProgress; notice: string | null; onCancel: () => void }) {
+  const percent = progress.total === 0 ? 0 : Math.round((progress.completed / progress.total) * 100)
+  return (
+    <div className="border-b border-line px-4 py-3 sm:px-5">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-text">{progress.active ? 'Searching Spotify…' : 'Spotify search'}</p>
+        <p className="text-sm text-muted tabular-nums">
+          {progress.completed} / {progress.total}
+        </p>
+      </div>
+      <div
+        className="mt-2 h-1.5 overflow-hidden rounded-full bg-field"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={progress.total}
+        aria-valuenow={progress.completed}
+        aria-label="Spotify search progress"
+      >
+        <div className="h-full bg-accent" style={{ width: `${percent}%` }} />
+      </div>
+      <p className="mt-2 text-xs leading-5 text-muted">
+        Matched {progress.matched} · Needs review {progress.needsReview} · Not found {progress.notFound}
+        {progress.errors > 0 ? ` · Errors ${progress.errors}` : ''}
+      </p>
+      {notice ? <p className="mt-2 text-sm leading-5 text-spot">{notice}</p> : null}
+      {progress.active ? (
+        <button type="button" onClick={onCancel} className="mt-2 inline-flex h-9 items-center rounded-full border border-line px-3 text-sm text-muted hover:text-text">
+          Cancel search
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
 function SongRow({
   entry,
   position,
   duplicate,
+  match,
+  searchBusy,
   onEdit,
   onRemove,
+  onSelectMatch,
+  onConfirmMatch,
+  onRetryMatch,
+  onManualSearch,
 }: {
   entry: SongEntry
   position: number
   duplicate: boolean
+  match: TrackMatch | undefined
+  searchBusy: boolean
   onEdit: (id: string, artist: string, title: string) => void
   onRemove: (id: string) => void
+  onSelectMatch: (songId: string, trackId: string) => void
+  onConfirmMatch: (songId: string) => void
+  onRetryMatch: (songId: string) => void
+  onManualSearch: (songId: string, query: string) => void
 }) {
   const [editing, setEditing] = useState(false)
   const [artist, setArtist] = useState(entry.artist)
@@ -263,6 +348,17 @@ function SongRow({
           ) : (
             <p className="mt-1 text-xs text-accent">{duplicate ? 'Duplicate' : 'Ready'}</p>
           )}
+          {match && !entry.issue ? (
+            <MatchDetails
+              songLabel={songLabel}
+              match={match}
+              busy={searchBusy}
+              onSelect={(trackId) => onSelectMatch(entry.id, trackId)}
+              onConfirm={() => onConfirmMatch(entry.id)}
+              onRetry={() => onRetryMatch(entry.id)}
+              onManualSearch={(query) => onManualSearch(entry.id, query)}
+            />
+          ) : null}
         </div>
         <div className="flex shrink-0 gap-1.5">
           <button

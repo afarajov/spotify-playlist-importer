@@ -1,6 +1,6 @@
 export type { AuthError, AuthErrorCode, AuthStatus, SpotifyAccount } from './auth.ts'
 export type { ImportFailure, ImportSummary } from './import-result.ts'
-export type { ConfirmationState, MatchStatus, TrackCandidate, TrackMatch } from './matching.ts'
+export type { ConfidenceLevel, ConfirmationState, ImportReadyTrack, MatchStatus, TrackCandidate, TrackMatch } from './matching.ts'
 export type { EditablePlaylist, PlaylistDestination, PlaylistVisibility } from './playlist.ts'
 export type { ParseIssue, ParseResult, ParseStatus, SongEntry, SongImportStatus, SongRecord, SongSource } from './song.ts'
 export type { InputMode, WorkflowStage } from './workflow.ts'

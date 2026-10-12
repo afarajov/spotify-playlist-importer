@@ -2,7 +2,7 @@
 
 Turn a list of songs into a Spotify playlist with as little effort as possible.
 
-This repository is a single-page playlist importer. Spotify sign-in uses the Authorization Code flow with PKCE in the browser. Manual lists and `.txt` or `.csv` files can be reviewed and edited. Track matching, playlist changes, and AI are not implemented yet.
+This repository is a single-page playlist importer. Spotify sign-in uses the Authorization Code flow with PKCE in the browser. Manual lists and `.txt` or `.csv` files can be reviewed, then matched to Spotify tracks with a local scoring algorithm. Playlist changes and AI parsing are not implemented yet.
 
 ## Stack
 
@@ -96,9 +96,25 @@ The Weeknd,Blinding Lights
 Arctic Monkeys,505
 ```
 
-Files are read in the browser as UTF-8, up to 1 MB and 1,000 songs. Nothing is uploaded. Choosing a file asks before it replaces a list you already typed or reviewed. The same artist and title, ignoring case and extra spaces, is marked as a duplicate and left in the list until you remove it.
+Files are read in the browser as UTF-8, up to 1 MB and 1,000 songs. Nothing is uploaded. Choosing a file asks before it replaces a list you already typed or reviewed. The same artist and title, ignoring case and extra spaces, is marked as a duplicate. Find on Spotify removes those later copies, along with lines that are not `Artist - Song Title`, and searches what remains. The first copy of a song stays.
 
-AI Mode does not parse this format. Spotify track search and playlist import are not implemented yet.
+AI Mode does not parse this format. Playlist import is not implemented yet.
+
+## Spotify search
+
+**Find on Spotify** searches only songs that already have an artist and a title. The search uses `GET /search?type=track&limit=10`. Development Mode does not allow a higher limit. Each song tries a precise `track:` and `artist:` query first, then a broader query, then a title query, and stops early when a match is already strong. At most three searches are used per song. Two songs are searched at a time, with a short pause between requests.
+
+Repeated artist and title pairs share one search result during that run. Cancelling a search keeps matches that already finished. A 429 with `Retry-After` waits once and retries that request. A 429 with `error.reason` of `QUOTA_EXCEEDED` stops the queue instead of retrying. A failed request is shown as an error, not as “not found”.
+
+Matching runs locally. It compares normalized artist and title text, then adjusts the score for live, remix, acoustic, radio-edit, and similar versions. A remaster is only a small penalty. The score is a 0–100 similarity score, not a probability:
+
+- High confidence: the track is selected automatically and can still be changed.
+- Medium confidence: the best track is shown and must be confirmed.
+- Low confidence or no suitable track: nothing is selected until the user chooses one.
+
+**Change match** lists the returned recordings. **Search manually** runs one explicit Spotify query for that row. Editing the artist or title clears that row’s match and leaves the other rows alone. Confirmed tracks and high-confidence matches are kept as an ordered list of Spotify URIs for the next phase. This phase does not create or change playlists.
+
+Thresholds and request limits live in `src/features/matching/config.ts`.
 
 ## Current status
 
@@ -109,15 +125,15 @@ Implemented:
 - Song list field that keeps its text when the mode changes, including across the Spotify redirect
 - Manual review of `Artist - Song Title` lines, plus `.txt` and `.csv` import
 - Editing, removal, validation, and exact duplicate marking
+- Spotify track search, local match scoring, alternative selection, and manual search
 - Mode-specific guidance and placeholders
-- Workflow indicator, with “Add Songs” as the current step
+- Workflow indicator, moving to “Review Matches” after a search starts
 - Spotify Authorization Code flow with PKCE, token refresh, profile display, and local disconnect
 - Shared TypeScript types for songs, matches, playlists, import results, and the connected account
 
 Not implemented:
 
 - AI parsing
-- Track search and matching
 - Playlist creation or import
 
 ## Layout
@@ -130,13 +146,14 @@ src/
   components/ui/        shared controls
   features/auth/        PKCE, token session, account controls
   features/song-input/  mode, text input, manual and CSV parsing, review
-  services/spotify/     authenticated request helper and profile
+  features/matching/    normalization, scoring, search queue, match review
+  services/spotify/     authenticated request helper, profile, and track search
   shared/types/         application data model
   config/               public environment values and Spotify endpoints
 ```
 
-Later phases can add `src/features/matching`, `src/features/playlists`, and `src/services/ai` without folding that work into the page component.
+Later phases can add `src/features/playlists` and `src/services/ai` without folding that work into the page component.
 
 ## Next phase
 
-Phase 4 is Spotify track search: take the prepared artist and title values and find candidate tracks. AI parsing stays separate.
+Phase 5 is playlist import. It can take the ordered Spotify track URIs that the user confirmed, or that matching accepted with high confidence, and add them to a playlist. AI parsing stays separate and must not choose track IDs.
