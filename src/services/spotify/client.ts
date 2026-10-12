@@ -40,6 +40,7 @@ type SpotifyJsonRequest = {
   fetchImpl?: typeof fetch
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
   body?: unknown
+  signal?: AbortSignal
 }
 
 export async function spotifyJson<T>(request: SpotifyJsonRequest): Promise<T> {
@@ -78,9 +79,10 @@ async function send(
         ...(request.body === undefined ? {} : { 'Content-Type': 'application/json' }),
       },
       body: request.body === undefined ? undefined : JSON.stringify(request.body),
+      signal: request.signal,
     })
   } catch (error) {
-    if (error instanceof SpotifyAuthError || error instanceof SpotifyApiError) {
+    if (isAbortError(error) || error instanceof SpotifyAuthError || error instanceof SpotifyApiError) {
       throw error
     }
     throw new SpotifyApiError({ kind: 'network', code: 'network' })
@@ -143,6 +145,10 @@ async function readJson(response: Response): Promise<unknown> {
   } catch {
     return null
   }
+}
+
+function isAbortError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError'
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -1,7 +1,16 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
+import { SpotifyAuthProvider } from '../auth/SpotifyAuthProvider.tsx'
 import { SongInputPanel } from './SongInputPanel.tsx'
+
+function renderPanel() {
+  return render(
+    <SpotifyAuthProvider>
+      <SongInputPanel />
+    </SpotifyAuthProvider>,
+  )
+}
 
 const manualList = [
   'The Weeknd - Blinding Lights',
@@ -15,7 +24,7 @@ const manualList = [
 describe('song review', () => {
   it('reviews manual input, corrects an invalid line, and updates counts', async () => {
     const user = userEvent.setup()
-    render(<SongInputPanel />)
+    renderPanel()
 
     await user.type(screen.getByLabelText('Song list'), manualList)
     await user.click(screen.getByRole('button', { name: 'Review Songs' }))
@@ -25,7 +34,8 @@ describe('song review', () => {
     expect(screen.getByText('Missing separator. Use Artist - Song Title.')).toBeInTheDocument()
     expect(screen.getByText('Artist name is required.')).toBeInTheDocument()
     expect(screen.getByText('Duplicate')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Prepare for search' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Find on Spotify' })).toBeDisabled()
+    expect(screen.getByText(/Connect Spotify in the header before searching/i)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Edit line 2' }))
     await user.type(screen.getByRole('textbox', { name: 'Artist' }), 'Arctic Monkeys')
@@ -40,7 +50,7 @@ describe('song review', () => {
 
   it('cancels an edit and removes a song without losing the typed list', async () => {
     const user = userEvent.setup()
-    render(<SongInputPanel />)
+    renderPanel()
     await user.type(screen.getByLabelText('Song list'), 'The Weeknd - Blinding Lights\nRadiohead - Creep')
     await user.click(screen.getByRole('button', { name: 'Review Songs' }))
 
@@ -59,7 +69,7 @@ describe('song review', () => {
 
   it('reopens the current review until the source text changes', async () => {
     const user = userEvent.setup()
-    render(<SongInputPanel />)
+    renderPanel()
     const songList = screen.getByLabelText('Song list')
     await user.type(songList, 'The Weeknd - Blinding Lights')
     await user.click(screen.getByRole('button', { name: 'Review Songs' }))
@@ -84,7 +94,7 @@ describe('song review', () => {
 
   it('imports a text file and asks before replacing an existing list', async () => {
     const user = userEvent.setup()
-    render(<SongInputPanel />)
+    renderPanel()
     await user.type(screen.getByLabelText('Song list'), 'Keep - Me')
     const file = new File(['Radiohead - Creep\n<script>alert(1)</script> - Title\n'], 'songs.txt', {
       type: 'text/plain',
@@ -105,7 +115,7 @@ describe('song review', () => {
 
   it('imports a CSV file into the same review list', async () => {
     const user = userEvent.setup()
-    render(<SongInputPanel />)
+    renderPanel()
     const file = new File(['title,artist\n505,Arctic Monkeys\nYellow,\n'], 'songs.csv', { type: 'text/csv' })
     await user.upload(screen.getByLabelText('Choose file'), file)
 
@@ -113,13 +123,13 @@ describe('song review', () => {
     expect(screen.getByText('505')).toBeInTheDocument()
     expect(screen.getByText('Artist name is required.')).toBeInTheDocument()
     expect(screen.getByLabelText('Song list')).toHaveValue('')
-    await user.click(screen.getByRole('button', { name: 'Prepare for search' }))
-    expect(screen.getByText(/Finding tracks comes in the next phase/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Find on Spotify' })).toBeDisabled()
+    expect(screen.getByText(/Connect Spotify in the header before searching/i)).toBeInTheDocument()
   })
 
   it('closes the review window without leaving the song list on the page', async () => {
     const user = userEvent.setup()
-    render(<SongInputPanel />)
+    renderPanel()
     await user.type(screen.getByLabelText('Song list'), 'The Weeknd - Blinding Lights')
     await user.click(screen.getByRole('button', { name: 'Review Songs' }))
     await user.click(screen.getByRole('button', { name: 'Close review' }))
@@ -135,7 +145,7 @@ describe('song review', () => {
 
   it('does not parse AI Mode text and keeps the typed list', async () => {
     const user = userEvent.setup()
-    render(<SongInputPanel />)
+    renderPanel()
     await user.type(screen.getByLabelText('Song list'), 'not a formatted line')
     await user.click(screen.getByRole('radio', { name: 'AI Mode' }))
 

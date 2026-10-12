@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { PrimaryButton } from '../../components/ui/PrimaryButton.tsx'
-import type { InputMode, SongEntry } from '../../shared/types/index.ts'
-import { duplicateEntryIds } from './duplicates.ts'
+import { useSpotifyMatching } from '../matching/useSpotifyMatching.ts'
+import type { InputMode, SongEntry, WorkflowStage } from '../../shared/types/index.ts'
+import { duplicateEntryIds, withoutProblemEntries } from './duplicates.ts'
 import { readSongDraft, writeSongDraft } from './draft.ts'
 import { FileUpload } from './FileUpload.tsx'
 import { describeInputStats } from './input-stats.ts'
@@ -21,7 +22,11 @@ type PendingImport = {
   entries: SongEntry[]
 }
 
-export function SongInputPanel() {
+type SongInputPanelProps = {
+  onWorkflowStage?: (stage: WorkflowStage) => void
+}
+
+export function SongInputPanel({ onWorkflowStage }: SongInputPanelProps) {
   const [storedDraft] = useState(() => readSongDraft())
   const [mode, setMode] = useState<InputMode>(storedDraft?.mode ?? 'manual')
   const [songText, setSongText] = useState(storedDraft?.text ?? '')
@@ -33,13 +38,21 @@ export function SongInputPanel() {
   const [reviewError, setReviewError] = useState<string | null>(null)
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
+  const [cleanupNote, setCleanupNote] = useState<string | null>(null)
   const [readingFile, setReadingFile] = useState(false)
   const fileRequest = useRef(0)
   const closeReview = useCallback(() => setReviewOpen(false), [])
+  const matching = useSpotifyMatching(review)
 
   useEffect(() => {
     writeSongDraft({ mode, text: songText, review, reviewedText, prepared, fileName })
   }, [mode, songText, review, reviewedText, prepared, fileName])
+
+  useEffect(() => {
+    const searching = matching.progress?.active === true
+    const hasMatches = Object.values(matching.matches).some((match) => match.status !== 'idle')
+    onWorkflowStage?.(searching || hasMatches ? 'review_matches' : 'add_songs')
+  }, [matching.matches, matching.progress, onWorkflowStage])
 
   const content = modeContent[mode]
   const stats = describeInputStats(songText)
@@ -69,6 +82,8 @@ export function SongInputPanel() {
     setReviewError(null)
     setPendingImport(null)
     setReviewOpen(true)
+    setCleanupNote(null)
+    matching.reset()
   }
 
   function requestReview() {
@@ -96,6 +111,33 @@ export function SongInputPanel() {
     setFileError(null)
     setPendingImport(null)
     setReviewOpen(true)
+    setCleanupNote(null)
+    matching.reset()
+  }
+
+  function findOnSpotify() {
+    if (!review) {
+      return
+    }
+    const kept = withoutProblemEntries(review)
+    const removed = review.length - kept.length
+    if (removed > 0) {
+      setReview(kept)
+      for (const entry of review) {
+        if (!kept.some((item) => item.id === entry.id)) {
+          matching.invalidate(entry.id)
+        }
+      }
+      if (review.every((entry) => entry.source !== 'csv')) {
+        const text = kept.map((entry) => `${entry.artist} - ${entry.title}`).join('\n')
+        setSongText(text)
+        setReviewedText(text)
+      }
+      setCleanupNote(removedLinesMessage(removed))
+    }
+    if (kept.length > 0) {
+      matching.find(kept)
+    }
   }
 
   async function handleFile(file: File) {
@@ -187,22 +229,47 @@ export function SongInputPanel() {
           open={reviewOpen}
           entries={review}
           duplicateIds={duplicateIds}
-          prepared={prepared}
+          matches={matching.matches}
+          progress={matching.progress}
+          notice={matching.notice}
+          cleanupNote={cleanupNote}
+          readyCount={matching.readyCount}
+          isAuthenticated={matching.isAuthenticated}
           onClose={closeReview}
           onEdit={(id, artist, title) => {
+            const previous = review.find((entry) => entry.id === id)
             const next = updateSongEntry(review, id, artist, title)
+            const updated = next.find((entry) => entry.id === id)
             setReview(next)
+            if (previous && updated && (previous.artist !== updated.artist || previous.title !== updated.title)) {
+              matching.invalidate(id)
+            }
             if (JSON.stringify(next) !== JSON.stringify(review)) {
               setPrepared(false)
             }
           }}
           onRemove={(id) => {
             setReview(removeSongEntry(review, id))
+            matching.invalidate(id)
             setPrepared(false)
           }}
-          onPrepare={() => setPrepared(true)}
+          onFind={findOnSpotify}
+          onCancelSearch={matching.cancel}
+          onSelectMatch={matching.select}
+          onConfirmMatch={matching.confirm}
+          onRetryMatch={matching.retry}
+          onManualSearch={(songId, query) => {
+            void matching.searchManually(songId, query)
+          }}
         />
       ) : null}
     </section>
   )
+}
+
+function removedLinesMessage(count: number): string {
+  if (count === 1) {
+    return 'Removed 1 line that was a duplicate or not written as Artist - Song Title.'
+  }
+  return `Removed ${count} lines that were duplicates or not written as Artist - Song Title.`
 }

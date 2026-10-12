@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SongEntry } from '../../shared/types/index.ts'
-import { duplicateEntryIds } from './duplicates.ts'
+import { duplicateEntryIds, withoutProblemEntries } from './duplicates.ts'
 import { removeSongEntry, updateSongEntry } from './review.ts'
 
 function song(overrides: Partial<SongEntry> & Pick<SongEntry, 'id' | 'artist' | 'title'>): SongEntry {
@@ -14,6 +14,17 @@ function song(overrides: Partial<SongEntry> & Pick<SongEntry, 'id' | 'artist' | 
 }
 
 describe('duplicate detection', () => {
+  it('drops unreadable lines and later copies, keeping the first song', () => {
+    const entries = [
+      song({ id: '1', artist: 'The Weeknd', title: 'Blinding Lights' }),
+      song({ id: '2', artist: '', title: '', issue: 'Missing separator. Use Artist - Song Title.', originalText: 'Arctic Monkeys 505' }),
+      song({ id: '3', artist: 'the weeknd', title: 'blinding lights' }),
+      song({ id: '4', artist: 'Radiohead', title: 'Creep' }),
+    ]
+
+    expect(withoutProblemEntries(entries).map((entry) => entry.id)).toEqual(['1', '4'])
+  })
+
   it('marks a later exact copy and ignores different songs', () => {
     const entries = [
       song({ id: '1', artist: 'The Weeknd', title: 'Blinding Lights', originalLine: 1 }),

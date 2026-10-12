@@ -1,0 +1,18 @@
+export const MATCHING = {
+  searchLimit: 10,
+  maxSearchesPerSong: 3,
+  concurrency: 2,
+  requestGapMs: 150,
+  rateLimitRetryCapSeconds: 20,
+  highScore: 84,
+  mediumScore: 66,
+  minimumScore: 52,
+  highArtist: 0.84,
+  highTitle: 0.8,
+  mediumArtist: 0.62,
+  mediumTitle: 0.7,
+  shortTitleLength: 3,
+  shortTitleArtist: 0.9,
+  tieGap: 4,
+  earlyStopScore: 90,
+} as const

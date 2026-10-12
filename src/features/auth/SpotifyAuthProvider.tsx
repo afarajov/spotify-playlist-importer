@@ -38,6 +38,7 @@ export function SpotifyAuthProvider({
         spotifySession.disconnect()
       },
       getValidAccessToken: () => spotifySession.getValidAccessToken(),
+      forceRefreshAccessToken: () => spotifySession.forceRefreshAccessToken(),
     }),
     [snapshot, spotifySession],
   )
