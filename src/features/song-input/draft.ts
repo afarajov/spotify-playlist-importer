@@ -87,7 +87,7 @@ function isSongEntry(value: unknown): value is SongEntry {
   }
   const entry = value as Partial<SongEntry>
   const source: SongSource | null =
-    entry.source === 'manual' || entry.source === 'txt' || entry.source === 'csv' ? entry.source : null
+    entry.source === 'manual' || entry.source === 'txt' || entry.source === 'csv' || entry.source === 'ai' ? entry.source : null
   return (
     typeof entry.id === 'string' &&
     source !== null &&

@@ -1,19 +1,21 @@
 type PendingFile = {
   fileName: string
-  kind: 'txt' | 'csv'
+  kind: 'txt' | 'csv' | 'docx'
 }
 
 type FileUploadProps = {
   disabled: boolean
   fileName: string | null
   error: string | null
+  note: string
   pending: PendingFile | null
+  replacesTypedText: boolean
   onFile: (file: File) => void
   onConfirm: () => void
   onCancel: () => void
 }
 
-export function FileUpload({ disabled, fileName, error, pending, onFile, onConfirm, onCancel }: FileUploadProps) {
+export function FileUpload({ disabled, fileName, error, note, pending, replacesTypedText, onFile, onConfirm, onCancel }: FileUploadProps) {
   return (
     <div className="mt-4 rounded-2xl border border-dashed border-line-strong/90 bg-field/60 px-4 py-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -22,7 +24,7 @@ export function FileUpload({ disabled, fileName, error, pending, onFile, onConfi
           <div className="min-w-0">
             <p className="text-sm font-medium">{fileName ? fileName : 'Import a file'}</p>
             <p id="file-upload-note" className="mt-0.5 text-sm leading-5 text-muted">
-              .txt or .csv, up to 1 MB and 1,000 songs. Files stay on this device.
+              {note}
             </p>
           </div>
         </div>
@@ -34,7 +36,7 @@ export function FileUpload({ disabled, fileName, error, pending, onFile, onConfi
           Choose file
           <input
             type="file"
-            accept=".txt,.csv,text/plain,text/csv"
+            accept=".txt,.csv,.docx,text/plain,text/csv,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             disabled={disabled}
             aria-describedby="file-upload-note"
             className="sr-only"
@@ -51,7 +53,7 @@ export function FileUpload({ disabled, fileName, error, pending, onFile, onConfi
       {pending ? (
         <div className="mt-3 flex flex-col gap-2 border-t border-line pt-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm leading-5 text-text">
-            {pending.kind === 'txt'
+            {replacesTypedText
               ? `Replace the current song list with ${pending.fileName}?`
               : `Use ${pending.fileName} for the review? The text you typed stays in the box.`}
           </p>

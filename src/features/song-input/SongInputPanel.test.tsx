@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SpotifyAuthProvider } from '../auth/SpotifyAuthProvider.tsx'
 import { SongInputPanel } from './SongInputPanel.tsx'
 
@@ -143,15 +143,65 @@ describe('song review', () => {
     expect(screen.getByText('Blinding Lights')).toBeInTheDocument()
   })
 
-  it('does not parse AI Mode text and keeps the typed list', async () => {
+  it('starts on the song form after a finished import', () => {
+    window.sessionStorage.setItem(
+      'spotify-playlist-importer.import-journal',
+      JSON.stringify({
+        id: 'done',
+        phase: 'completed',
+        playlistId: 'playlist1',
+        playlistName: "Ali's liked songs",
+        tracks: [],
+        batches: [],
+      }),
+    )
+
+    renderPanel()
+
+    expect(screen.getByLabelText('Song list')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Import results' })).not.toBeInTheDocument()
+    expect(window.sessionStorage.getItem('spotify-playlist-importer.import-journal')).toBeNull()
+  })
+
+  it('organizes AI Mode text without parsing it as Artist - Song Title', async () => {
     const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      songs: [
+        { artist: 'The Weeknd', title: 'Blinding Lights', uncertain: false, note: '' },
+        { artist: '', title: '', uncertain: true, note: 'This line does not name a song.' },
+      ],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
     renderPanel()
     await user.type(screen.getByLabelText('Song list'), 'not a formatted line')
     await user.click(screen.getByRole('radio', { name: 'AI Mode' }))
 
-    expect(screen.getByRole('button', { name: 'Review Songs' })).toBeDisabled()
-    expect(screen.getByLabelText('Choose file')).toBeDisabled()
-    expect(screen.queryByRole('region', { name: 'Song review' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Choose file')).toBeEnabled()
     expect(screen.getByLabelText('Song list')).toHaveValue('not a formatted line')
+    await user.click(screen.getByRole('button', { name: 'Review Songs' }))
+
+    expect(await screen.findByRole('dialog', { name: 'Parsed songs' })).toBeInTheDocument()
+    expect(screen.getByText('Blinding Lights')).toBeInTheDocument()
+    expect(screen.getByText('This line does not name a song.')).toBeInTheDocument()
+    expect(screen.queryByText('Missing separator. Use Artist - Song Title.')).not.toBeInTheDocument()
   })
+
+  it('organizes a text file in AI Mode', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      songs: [{ artist: 'Radiohead', title: 'Creep', uncertain: false, note: '' }],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+    renderPanel()
+    await user.click(screen.getByRole('radio', { name: 'AI Mode' }))
+    const file = new File(['creep radiohead\n'], 'songs.txt', { type: 'text/plain' })
+    await user.upload(screen.getByLabelText('Choose file'), file)
+
+    expect(await screen.findByRole('dialog', { name: 'Parsed songs' })).toBeInTheDocument()
+    expect(screen.getByText('Creep')).toBeInTheDocument()
+    expect(screen.getByLabelText('Song list')).toHaveValue('creep radiohead\n')
+    expect(screen.getByText('songs.txt')).toBeInTheDocument()
+  })
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })

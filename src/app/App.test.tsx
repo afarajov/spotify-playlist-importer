@@ -55,9 +55,9 @@ describe('App', () => {
     expect(songList).toHaveValue('Radiohead - Creep')
     expect(songList.getAttribute('placeholder')).toContain('blinding lights by weekend')
     expect(screen.getByText('1 line · 17 characters')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Review Songs' })).toBeDisabled()
-    expect(screen.getByLabelText('Choose file')).toBeDisabled()
-    expect(screen.getByText(/AI processing is coming later/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Review Songs' })).toBeEnabled()
+    expect(screen.getByLabelText('Choose file')).toBeEnabled()
+    expect(screen.getByText(/Review sends this text to the organizer/i)).toBeInTheDocument()
   })
 
   it('keeps the song list when returning to Manual Mode', async () => {

@@ -71,7 +71,7 @@ describe('Spotify match review', () => {
     await user.click(screen.getByRole('button', { name: 'Review Songs' }))
     await user.click(screen.getByRole('button', { name: 'Find on Spotify' }))
 
-    expect(await screen.findByText('High confidence')).toBeInTheDocument()
+    expect((await screen.findAllByText(/Confirmed/)).length).toBeGreaterThan(0)
     await waitFor(() => {
       expect(screen.getByRole('progressbar', { name: 'Spotify search progress' })).toHaveAttribute('aria-valuenow', '2')
     })
@@ -84,7 +84,7 @@ describe('Spotify match review', () => {
     await user.click(screen.getByRole('button', { name: /Blinding Lights - Live/i }))
     await user.click(screen.getByRole('button', { name: 'Confirm' }))
     expect(screen.queryByRole('list', { name: /Other matches for/i })).not.toBeInTheDocument()
-    expect(screen.getByText(/Confirmed/)).toBeInTheDocument()
+    expect(screen.getAllByText(/Confirmed/).length).toBeGreaterThan(0)
     expect(screen.getAllByText('Creep').length).toBeGreaterThan(0)
 
     await user.click(screen.getByRole('button', { name: 'Edit The Weeknd - Blinding Lights' }))

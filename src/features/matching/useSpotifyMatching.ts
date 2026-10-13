@@ -57,8 +57,8 @@ export function useSpotifyMatching(review: SongEntry[] | null) {
       active: run.active,
       total: run.ids.length,
       completed: relevant.filter((match) => match.status !== 'searching' && match.status !== 'idle').length,
-      matched: relevant.filter((match) => match.status === 'matched').length,
-      needsReview: relevant.filter((match) => match.status === 'needs_review').length,
+      matched: relevant.filter((match) => match.status === 'matched' || (match.status === 'needs_review' && match.confirmation === 'confirmed')).length,
+      needsReview: relevant.filter((match) => match.status === 'needs_review' && match.confirmation !== 'confirmed').length,
       notFound: relevant.filter((match) => match.status === 'not_found').length,
       errors: relevant.filter((match) => match.status === 'error').length,
     }
@@ -201,12 +201,12 @@ export function useSpotifyMatching(review: SongEntry[] | null) {
       const tracks = await searchTracks({ query: trimmed, tokenSource, signal: controller.signal })
       const ranked = rankCandidates(entry.artist, entry.title, tracks)
       applyMatch(generation, songId, {
-        status: ranked.candidates.length === 0 ? 'not_found' : 'needs_review',
+        status: ranked.status,
         candidates: ranked.candidates,
-        selectedTrackId: null,
+        selectedTrackId: ranked.selectedTrackId,
         confidence: ranked.confidence,
         score: ranked.score,
-        confirmation: 'unreviewed',
+        confirmation: ranked.selectedTrackId ? 'confirmed' : 'unreviewed',
         manuallySelected: false,
         errorMessage: null,
         queryArtist: entry.artist,
