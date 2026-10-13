@@ -4,7 +4,7 @@ export type ParseStatus = 'pending' | 'parsed' | 'uncertain' | 'invalid'
 
 export type SongImportStatus = 'pending' | 'imported' | 'skipped' | 'failed'
 
-export type SongSource = 'manual' | 'txt' | 'csv'
+export type SongSource = 'manual' | 'txt' | 'csv' | 'ai'
 
 /**
  * A song line after manual or file parsing.

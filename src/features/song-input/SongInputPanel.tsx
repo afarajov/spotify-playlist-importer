@@ -10,6 +10,7 @@ import { FileUpload } from './FileUpload.tsx'
 import { describeInputStats } from './input-stats.ts'
 import { modeContent } from './mode-content.ts'
 import { ModeSelector } from './ModeSelector.tsx'
+import { parseAiText } from './parse-ai.ts'
 import { parseCsvText } from './parse-csv.ts'
 import { parseManualText } from './parse-manual.ts'
 import { readSongFile } from './read-song-file.ts'
@@ -19,9 +20,9 @@ import { SongReview } from './SongReview.tsx'
 
 type PendingImport = {
   fileName: string
-  kind: 'txt' | 'csv'
+  kind: 'txt' | 'csv' | 'docx'
   text: string
-  entries: SongEntry[]
+  entries: SongEntry[] | null
 }
 
 type SongInputPanelProps = {
@@ -42,9 +43,11 @@ export function SongInputPanel({ onWorkflowStage }: SongInputPanelProps) {
   const [reviewOpen, setReviewOpen] = useState(false)
   const [cleanupNote, setCleanupNote] = useState<string | null>(null)
   const [readingFile, setReadingFile] = useState(false)
-  const [showImport, setShowImport] = useState(() => readImportJournal() !== null)
+  const [organizing, setOrganizing] = useState(false)
+  const [showImport, setShowImport] = useState(openImportScreenOnLoad)
   const [importSession, setImportSession] = useState(0)
   const fileRequest = useRef(0)
+  const organizeRequest = useRef<AbortController | null>(null)
   const closeReview = useCallback(() => setReviewOpen(false), [])
   const matching = useSpotifyMatching(review)
 
@@ -64,13 +67,17 @@ export function SongInputPanel({ onWorkflowStage }: SongInputPanelProps) {
   const content = modeContent[mode]
   const stats = describeInputStats(songText)
   const textChanged = review !== null && songText !== reviewedText
-  const canReview = mode === 'manual' && (songText.trim().length > 0 || (review !== null && !textChanged))
+  const canReview = !organizing && (songText.trim().length > 0 || (review !== null && !textChanged))
   const duplicateIds = duplicateEntryIds(review ?? [])
-  const reviewNote = mode === 'ai'
-    ? 'AI processing is coming later. Manual Mode can review an Artist - Song Title list now.'
-    : textChanged
-      ? 'The text has changed.'
-      : 'Use Artist - Song Title, one song on each line.'
+  const reviewNote = organizing
+    ? 'Organizing the list. Spotify is not searched yet.'
+    : mode === 'ai'
+      ? textChanged
+        ? 'The text has changed. Review will organize it again.'
+        : 'Review sends this text to the organizer. Spotify is not searched yet.'
+      : textChanged
+        ? 'The text has changed.'
+        : 'Use Artist - Song Title, one song on each line.'
 
   function applyTextReview() {
     const result = parseManualText(songText, { source: 'manual' })
@@ -101,15 +108,53 @@ export function SongInputPanel({ onWorkflowStage }: SongInputPanelProps) {
       setReviewOpen(true)
       return
     }
+    if (mode === 'ai') {
+      void organizeWithAi()
+      return
+    }
     applyTextReview()
   }
 
+  async function organizeWithAi(text = songText, nextFileName: string | null = null) {
+    organizeRequest.current?.abort()
+    const controller = new AbortController()
+    organizeRequest.current = controller
+    setOrganizing(true)
+    setReviewError(null)
+    setSongText(text)
+    setFileName(nextFileName)
+    const result = await parseAiText(text, controller.signal)
+    if (organizeRequest.current !== controller) {
+      return
+    }
+    setOrganizing(false)
+    if (!result.ok) {
+      if (result.message) {
+        setReviewError(result.message)
+      }
+      return
+    }
+    setReview(result.entries)
+    setReviewedText(text)
+    setPrepared(false)
+    setPendingImport(null)
+    setReviewOpen(true)
+    setCleanupNote(null)
+    matching.reset()
+  }
+
   function applyImport(imported: PendingImport) {
-    if (imported.kind === 'txt') {
+    if (imported.entries === null) {
+      setPendingImport(null)
+      setFileError(null)
+      void organizeWithAi(imported.text, imported.fileName)
+      return
+    }
+    if (imported.kind === 'csv') {
+      setReviewedText(songText)
+    } else {
       setSongText(imported.text)
       setReviewedText(imported.text)
-    } else {
-      setReviewedText(songText)
     }
     setReview(imported.entries)
     setFileName(imported.fileName)
@@ -172,9 +217,18 @@ export function SongInputPanel({ onWorkflowStage }: SongInputPanelProps) {
       setFileError(read.message)
       return
     }
-    const parsed = read.kind === 'txt'
-      ? parseManualText(read.text, { source: 'txt' })
-      : parseCsvText(read.text)
+    if (mode === 'ai') {
+      const imported = { fileName: read.fileName, kind: read.kind, text: read.text, entries: null }
+      if (review !== null || songText.trim().length > 0) {
+        setPendingImport(imported)
+        return
+      }
+      applyImport(imported)
+      return
+    }
+    const parsed = read.kind === 'csv'
+      ? parseCsvText(read.text)
+      : parseManualText(read.text, { source: 'txt' })
     if (!parsed.ok) {
       setFileError(parsed.message)
       return
@@ -208,7 +262,15 @@ export function SongInputPanel({ onWorkflowStage }: SongInputPanelProps) {
       aria-label="Song input"
       className="mt-5 rounded-[28px] border border-line bg-panel p-4 shadow-[0_30px_80px_-48px_rgb(0_0_0/0.9)] sm:p-5"
     >
-      <ModeSelector mode={mode} onChange={setMode} />
+      <ModeSelector
+        mode={mode}
+        onChange={(next) => {
+          organizeRequest.current?.abort()
+          organizeRequest.current = null
+          setOrganizing(false)
+          setMode(next)
+        }}
+      />
       <div id="mode-guidance" className="mt-3">
         <p className="text-sm leading-6 text-muted">{content.description}</p>
         <p className="mt-1 text-sm leading-6 text-muted">
@@ -226,10 +288,14 @@ export function SongInputPanel({ onWorkflowStage }: SongInputPanelProps) {
         {stats.lineLabel} · {stats.characterLabel}
       </p>
       <FileUpload
-        disabled={mode !== 'manual' || readingFile}
+        disabled={readingFile || organizing}
         fileName={fileName}
         error={fileError}
+        note={mode === 'ai'
+          ? '.txt, .csv, or .docx, up to 1 MB. The file text is organized before Spotify search.'
+          : '.txt, .csv, or .docx, up to 1 MB and 1,000 songs. Files stay on this device.'}
         pending={pendingImport}
+        replacesTypedText={mode === 'ai' || pendingImport?.kind !== 'csv'}
         onFile={(file) => {
           void handleFile(file)
         }}
@@ -245,7 +311,7 @@ export function SongInputPanel({ onWorkflowStage }: SongInputPanelProps) {
           {reviewNote}
         </p>
         <PrimaryButton disabled={!canReview} describedBy="review-songs-note" onClick={requestReview}>
-          Review Songs
+          {organizing ? 'Organizing…' : 'Review Songs'}
         </PrimaryButton>
       </div>
       {reviewError ? (
@@ -295,6 +361,17 @@ export function SongInputPanel({ onWorkflowStage }: SongInputPanelProps) {
       ) : null}
     </section>
   )
+}
+
+function openImportScreenOnLoad(): boolean {
+  const saved = readImportJournal()
+  if (!saved || saved.phase === 'completed') {
+    if (saved) {
+      writeImportJournal(null)
+    }
+    return false
+  }
+  return true
 }
 
 function removedLinesMessage(count: number): string {

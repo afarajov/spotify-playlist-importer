@@ -2,7 +2,7 @@
 
 Turn a list of songs into a Spotify playlist with as little effort as possible.
 
-This repository is a single-page playlist importer. Spotify sign-in uses the Authorization Code flow with PKCE in the browser. Manual lists and `.txt` or `.csv` files can be reviewed, matched to Spotify tracks locally, and appended to a playlist. AI parsing is not implemented yet.
+This repository is a single-page playlist importer. Spotify sign-in uses the Authorization Code flow with PKCE in the browser. Manual lists, `.txt`, `.csv`, or `.docx` files, and messy text organized by a local AI server can be reviewed, matched to Spotify tracks locally, and appended to a playlist. The AI server sees only the song text.
 
 ## Stack
 
@@ -27,6 +27,7 @@ Open `http://127.0.0.1:5173`. Spotify does not accept `localhost` as a redirect 
 | Command | Purpose |
 | --- | --- |
 | `npm run dev` | Start the development server |
+| `npm run server` | Start the local organizer on `127.0.0.1:8787` |
 | `npm run build` | Typecheck and create a production build |
 | `npm run preview` | Serve the production build locally |
 | `npm run typecheck` | Run the TypeScript project build |
@@ -88,7 +89,7 @@ Radiohead - Creep
 
 The separator is ` - `, including the spaces. Only the first separator matters, so `Artist - Song Title - Live Version` keeps `Song Title - Live Version` as the title. Empty lines are skipped. A line without that separator, or with a missing artist or title, stays in the review with an explanation. Spelling is not corrected here.
 
-`.txt` files use the same format. `.csv` files need `artist` and `title` columns in either order. Extra columns are ignored. Quoted values can contain commas.
+`.txt` files use the same format. `.docx` files use one paragraph per song in that same format. `.csv` files need `artist` and `title` columns in either order. Extra columns are ignored. Quoted values can contain commas.
 
 ```csv
 artist,title
@@ -98,7 +99,7 @@ Arctic Monkeys,505
 
 Files are read in the browser as UTF-8, up to 1 MB and 1,000 songs. Nothing is uploaded. Choosing a file asks before it replaces a list you already typed or reviewed. The same artist and title, ignoring case and extra spaces, is marked as a duplicate. Find on Spotify removes those later copies, along with lines that are not `Artist - Song Title`, and searches what remains. The first copy of a song stays.
 
-AI Mode does not parse this format. The same duplicate rows are not removed during import. A repeated song in the list stays repeated unless that exact Spotify track is already in the destination playlist and skipping is turned on.
+AI Mode does not use this separator. **Review Songs** sends the typed text to `POST /api/parse-songs` on the local organizer. The model is `gpt-6-luna` with reasoning turned off. It may correct an obvious artist or title spelling and must mark an unclear line as uncertain instead of inventing a song. The server checks that shape before the page shows it. Unclear lines stay in the review until they have both an artist and a title. Find on Spotify still searches only complete lines. The same duplicate rows are not removed during import. A repeated song in the list stays repeated unless that exact Spotify track is already in the destination playlist and skipping is turned on.
 
 ## Spotify search
 
@@ -139,28 +140,28 @@ Implemented:
 - Dark single-page layout
 - AI Mode / Manual Mode toggle, defaulting to Manual Mode
 - Song list field that keeps its text when the mode changes, including across the Spotify redirect
-- Manual review of `Artist - Song Title` lines, plus `.txt` and `.csv` import
+- Manual review of `Artist - Song Title` lines, plus `.txt`, `.csv`, and `.docx` import
 - Editing, removal, validation, and exact duplicate marking
 - Spotify track search, local match scoring, alternative selection, and manual search
 - Mode-specific guidance and placeholders
+- AI organizing for messy text, through the local server, with uncertain lines kept visible
 - Workflow indicator through review, playlist choice, and import
 - Spotify Authorization Code flow with PKCE, token refresh, profile display, and local disconnect
 - Playlist selection, private or public playlist creation, ordered batch import, and result reporting
 
-Not implemented:
-
-- AI parsing
+The organizer is a second local process. Run `npm run server` beside `npm run dev`. Its key is `OPENAI_API_KEY` in `server/.env`, which git already ignores. The page does not receive that key.
 
 ## Layout
 
 ```text
+server/               local organizer, song schema, and response checks
 src/
   app/                  page composition and layout width
   components/layout/    header, hero, footer
   components/workflow/  import steps
   components/ui/        shared controls
   features/auth/        PKCE, token session, account controls
-  features/song-input/  mode, text input, manual and CSV parsing, review
+  features/song-input/  mode, text input, manual, CSV, and AI review
   features/matching/    normalization, scoring, search queue, match review
   features/import/      playlist choice, import plan, batches, and recovery
   services/spotify/     authenticated request helper, profile, search, and playlists
@@ -168,8 +169,6 @@ src/
   config/               public environment values and Spotify endpoints
 ```
 
-Later phases can add `src/services/ai` without folding that work into the page component.
-
 ## Next phase
 
-Phase 6 is AI parsing. It should turn a messy song list into the same reviewed song entries Manual Mode already uses. It must not search Spotify, choose track IDs, or change how playlists are imported.
+The organizer runs only on this machine. A later phase can host that same server. It must still keep the model away from Spotify tokens, track IDs, and playlist contents.

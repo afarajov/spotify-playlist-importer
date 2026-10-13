@@ -148,7 +148,7 @@ function resultMatch(song: MatchSong, result: { status: TrackMatch['status']; ca
     selectedTrackId: result.selectedTrackId,
     confidence: result.confidence,
     score: result.score,
-    confirmation: 'unreviewed',
+    confirmation: result.selectedTrackId ? 'confirmed' : 'unreviewed',
     manuallySelected: false,
     errorMessage: null,
     queryArtist: song.artist,
